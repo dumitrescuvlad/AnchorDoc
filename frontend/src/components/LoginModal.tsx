@@ -41,7 +41,7 @@ export default function LoginModal({
       );
       setSession(res);
       onClose();
-      nav("/upload");
+      nav(res.role === "company" ? "/upload" : "/dashboard");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Login failed");
     }

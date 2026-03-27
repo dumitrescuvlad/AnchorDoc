@@ -20,7 +20,7 @@ export default function LoginPage() {
       );
 
       setSession(res);
-      nav("/upload");
+      nav(res.role === "company" ? "/upload" : "/dashboard");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Login failed");
     }
