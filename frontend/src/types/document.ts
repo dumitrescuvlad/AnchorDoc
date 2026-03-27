@@ -1,9 +1,10 @@
 export type DocumentStatus = "NOTARIZED";
 
 export type DocumentMetadata = {
-  documentNumber?: string;
-  documentDate?: string;
-  client?: string;
+  issuer: string;
+  receiver: string;
+  documentType: string;
+  shipmentId: string;
 };
 
 export type DocumentItem = {

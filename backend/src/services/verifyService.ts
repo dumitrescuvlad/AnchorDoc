@@ -1,4 +1,9 @@
-import { sha256FromBuffer } from "../utils/hash.js";
+import { sha256FromBuffer, sha256FromFileAndMetadata } from "../utils/hash.js";
+import {
+  isBlankMetadata,
+  serializeMetadataForHash,
+  type DocumentBusinessMetadata,
+} from "../utils/documentMetadata.js";
 import {
   getDocumentById,
   getDocumentBySha,
@@ -8,6 +13,7 @@ import {
 export type VerifyParams = {
   docId?: string;
   sha256?: string;
+  submittedMetadata: DocumentBusinessMetadata;
 };
 
 export type VerifyResult =
@@ -20,6 +26,7 @@ export type VerifyResult =
       iotaTxDigest: null;
       iotaObjectId: null;
       metadata: Record<string, unknown>;
+      submittedMetadata: DocumentBusinessMetadata;
     }
   | {
       result: "VERIFIED" | "MODIFIED";
@@ -30,13 +37,17 @@ export type VerifyResult =
       iotaTxDigest: string | null;
       iotaObjectId: string | null;
       metadata: Record<string, unknown>;
+      submittedMetadata: DocumentBusinessMetadata;
     };
 
 export async function verifyDocument(
   fileBuffer: Buffer,
   params: VerifyParams,
 ): Promise<VerifyResult> {
-  const computedSha256 = sha256FromBuffer(fileBuffer);
+  const metadataJson = serializeMetadataForHash(params.submittedMetadata);
+  const computedSha256 = sha256FromFileAndMetadata(fileBuffer, metadataJson);
+  const legacyBlank = isBlankMetadata(params.submittedMetadata);
+  const legacyFileOnlySha = legacyBlank ? sha256FromBuffer(fileBuffer) : null;
 
   let record: DocumentRow | undefined;
 
@@ -52,6 +63,10 @@ export async function verifyDocument(
     record = getDocumentBySha(computedSha256);
   }
 
+  if (!record && legacyFileOnlySha) {
+    record = getDocumentBySha(legacyFileOnlySha);
+  }
+
   if (!record) {
     return {
       result: "NOT_FOUND",
@@ -62,11 +77,16 @@ export async function verifyDocument(
       iotaTxDigest: null,
       iotaObjectId: null,
       metadata: {},
+      submittedMetadata: params.submittedMetadata,
     };
   }
 
   const notarizedSha256 = record.sha256;
-  const isMatch = computedSha256 === notarizedSha256;
+  const isMatch =
+    computedSha256 === notarizedSha256 ||
+    (legacyBlank &&
+      legacyFileOnlySha != null &&
+      legacyFileOnlySha === notarizedSha256);
 
   return {
     result: isMatch ? "VERIFIED" : "MODIFIED",
@@ -77,5 +97,6 @@ export async function verifyDocument(
     iotaTxDigest: record.iotaTxDigest,
     iotaObjectId: record.iotaObjectId,
     metadata: JSON.parse(record.metadataJson || "{}"),
+    submittedMetadata: params.submittedMetadata,
   };
 }

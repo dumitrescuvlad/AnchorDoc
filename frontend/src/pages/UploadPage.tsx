@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import Shell from "../components/Shell";
 import { apiNotarize } from "../lib/api/documents";
+import { sha256FileAndMetadata } from "../lib/documentMetadata";
 import type { NotarizeResponse } from "../types/document";
 
 type Step = "IDLE" | "HASH" | "NOTARIZING" | "DONE" | "ERROR";
@@ -11,19 +12,25 @@ export default function UploadPage() {
   const [sha, setSha] = useState<string>("");
   const [doc, setDoc] = useState<NotarizeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [issuer, setIssuer] = useState("");
+  const [receiver, setReceiver] = useState("");
+  const [documentType, setDocumentType] = useState("");
+  const [shipmentId, setShipmentId] = useState("");
+
+  const metadataPayload = useMemo(
+    () => ({
+      issuer: issuer.trim(),
+      receiver: receiver.trim(),
+      documentType: documentType.trim(),
+      shipmentId: shipmentId.trim(),
+    }),
+    [issuer, receiver, documentType, shipmentId],
+  );
 
   const fileMeta = useMemo(() => {
     if (!file) return null;
     return `${(file.size / (1024 * 1024)).toFixed(2)} MB · PDF`;
   }, [file]);
-
-  async function computeSha256Browser(fileToHash: File) {
-    const buffer = await fileToHash.arrayBuffer();
-    const hash = await crypto.subtle.digest("SHA-256", buffer);
-    const bytes = Array.from(new Uint8Array(hash));
-
-    return bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  }
 
   async function onPickFile(fileToUpload: File) {
     setError(null);
@@ -31,7 +38,10 @@ export default function UploadPage() {
     setFile(fileToUpload);
 
     setStep("HASH");
-    const computedSha = await computeSha256Browser(fileToUpload);
+    const computedSha = await sha256FileAndMetadata(
+      fileToUpload,
+      metadataPayload,
+    );
     setSha(computedSha);
 
     setStep("NOTARIZING");
@@ -39,6 +49,7 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       formData.append("file", fileToUpload);
+      formData.append("metadata", JSON.stringify(metadataPayload));
 
       const out = await apiNotarize(formData);
       setDoc(out);
@@ -68,6 +79,33 @@ export default function UploadPage() {
               anchor the proof on IOTA. The original file stays off-chain while
               the proof remains immutable and verifiable.
             </p>
+          </div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Issuer"
+              value={issuer}
+              onChange={setIssuer}
+              placeholder="Optional"
+            />
+            <Field
+              label="Receiver"
+              value={receiver}
+              onChange={setReceiver}
+              placeholder="Optional"
+            />
+            <Field
+              label="Document type"
+              value={documentType}
+              onChange={setDocumentType}
+              placeholder="Optional"
+            />
+            <Field
+              label="Shipment ID"
+              value={shipmentId}
+              onChange={setShipmentId}
+              placeholder="Optional"
+            />
           </div>
 
           <div
@@ -118,8 +156,12 @@ export default function UploadPage() {
 
           <div className="mt-5 space-y-3">
             <StatusRow
-              title="1 Generate SHA-256"
-              description={sha ? `SHA-256 · ${sha.slice(0, 16)}…` : "Waiting"}
+              title="1 Generate fingerprint"
+              description={
+                sha
+                  ? `SHA-256 (file + metadata) · ${sha.slice(0, 16)}…`
+                  : "Waiting"
+              }
               status={step === "HASH" ? "processing" : sha ? "done" : "idle"}
             />
 
@@ -146,6 +188,18 @@ export default function UploadPage() {
             </div>
           )}
 
+          {doc?.metadata && (
+            <div className="mt-5 space-y-3 rounded-xl border border-border bg-surface/50 p-4 text-left">
+              <div className="text-xs font-medium uppercase tracking-wide text-textMuted">
+                Business metadata
+              </div>
+              <MetaRow label="Issuer" value={doc.metadata.issuer} />
+              <MetaRow label="Receiver" value={doc.metadata.receiver} />
+              <MetaRow label="Document type" value={doc.metadata.documentType} />
+              <MetaRow label="Shipment ID" value={doc.metadata.shipmentId} />
+            </div>
+          )}
+
           {doc?.iotaExplorerUrl && (
             <a
               className="mt-5 inline-flex w-full items-center justify-center rounded-xl border border-border px-3 py-2.5 text-sm font-medium transition hover:bg-surface"
@@ -159,6 +213,43 @@ export default function UploadPage() {
         </aside>
       </div>
     </Shell>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-textMuted">
+        {label}
+      </label>
+      <input
+        className="w-full rounded-xl border border-border px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-primarySoft"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs text-textMuted">{label}</div>
+      <div className="mt-0.5 text-sm font-medium text-text">
+        {value || "—"}
+      </div>
+    </div>
   );
 }
 

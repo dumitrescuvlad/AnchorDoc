@@ -69,7 +69,10 @@ export default function DashboardPage() {
     return items.find((item) => item.notarizedAt)?.notarizedAt || "—";
   }, [items]);
 
-  async function verifyWithUpload(docId: string) {
+  async function verifyWithUpload(
+    docId: string,
+    meta: DocumentDetails["metadata"] | undefined,
+  ) {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "application/pdf";
@@ -81,6 +84,16 @@ export default function DashboardPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("docId", docId);
+
+      formData.append(
+        "metadata",
+        JSON.stringify({
+          issuer: meta?.issuer ?? "",
+          receiver: meta?.receiver ?? "",
+          documentType: meta?.documentType ?? "",
+          shipmentId: meta?.shipmentId ?? "",
+        }),
+      );
 
       const res = await apiVerify(formData);
 
@@ -237,6 +250,22 @@ export default function DashboardPage() {
 
                 <DetailField label="SHA-256" value={selected.sha256} mono />
                 <DetailField
+                  label="Issuer"
+                  value={selected.metadata?.issuer || "—"}
+                />
+                <DetailField
+                  label="Receiver"
+                  value={selected.metadata?.receiver || "—"}
+                />
+                <DetailField
+                  label="Document type"
+                  value={selected.metadata?.documentType || "—"}
+                />
+                <DetailField
+                  label="Shipment ID"
+                  value={selected.metadata?.shipmentId || "—"}
+                />
+                <DetailField
                   label="Timestamp"
                   value={selected.notarizedAt || "—"}
                   mono
@@ -261,7 +290,9 @@ export default function DashboardPage() {
 
                 <button
                   className="w-full rounded-xl border border-border px-3 py-2.5 text-sm font-medium transition hover:bg-surface"
-                  onClick={() => verifyWithUpload(selected.id)}
+                  onClick={() =>
+                    verifyWithUpload(selected.id, selected.metadata)
+                  }
                 >
                   Verify document
                 </button>

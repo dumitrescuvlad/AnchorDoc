@@ -7,6 +7,10 @@ export type VerifyResult =
       notarizedSha256: null;
       notarizedAt: null;
       iotaExplorerUrl: null;
+      iotaTxDigest: null;
+      iotaObjectId: null;
+      metadata: Record<string, unknown>;
+      submittedMetadata: DocumentMetadata;
     }
   | {
       result: "VERIFIED" | "MODIFIED";
@@ -17,4 +21,5 @@ export type VerifyResult =
       iotaTxDigest: string | null;
       iotaObjectId: string | null;
       metadata: DocumentMetadata;
+      submittedMetadata: DocumentMetadata;
     };

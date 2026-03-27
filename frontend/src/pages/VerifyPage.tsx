@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Shell from "../components/Shell";
 import { apiVerify } from "../lib/api/verify";
 import type { VerifyResult } from "../types/verify";
@@ -9,6 +9,20 @@ export default function VerifyPage() {
   const [sha, setSha] = useState("");
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [issuer, setIssuer] = useState("");
+  const [receiver, setReceiver] = useState("");
+  const [documentType, setDocumentType] = useState("");
+  const [shipmentId, setShipmentId] = useState("");
+
+  const metadataPayload = useMemo(
+    () => ({
+      issuer: issuer.trim(),
+      receiver: receiver.trim(),
+      documentType: documentType.trim(),
+      shipmentId: shipmentId.trim(),
+    }),
+    [issuer, receiver, documentType, shipmentId],
+  );
 
   async function run() {
     setError(null);
@@ -21,6 +35,7 @@ export default function VerifyPage() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("metadata", JSON.stringify(metadataPayload));
 
     if (docId) formData.append("docId", docId);
     if (sha) formData.append("sha256", sha);
@@ -104,6 +119,34 @@ export default function VerifyPage() {
                 />
               </div>
 
+              <div className="rounded-xl border border-border bg-surface/30 p-4">
+                <div className="mb-3 text-xs font-medium uppercase tracking-wide text-textMuted">
+                  Business metadata
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <VerifyField
+                    label="Issuer"
+                    value={issuer}
+                    onChange={setIssuer}
+                  />
+                  <VerifyField
+                    label="Receiver"
+                    value={receiver}
+                    onChange={setReceiver}
+                  />
+                  <VerifyField
+                    label="Document type"
+                    value={documentType}
+                    onChange={setDocumentType}
+                  />
+                  <VerifyField
+                    label="Shipment ID"
+                    value={shipmentId}
+                    onChange={setShipmentId}
+                  />
+                </div>
+              </div>
+
               {error && (
                 <div className="rounded-xl border border-dangerSoft bg-dangerSoft p-3 text-sm text-danger">
                   {error}
@@ -142,13 +185,13 @@ export default function VerifyPage() {
             </div>
 
             <div className="mt-2 text-sm text-textMuted">
-              Verification result based on the uploaded file and available
-              notarized data.
+              Verification uses the PDF plus the business metadata fields
+              below (same fingerprint as notarization).
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <ResultField
-                label="Computed SHA-256"
+                label="Computed SHA-256 (file + metadata)"
                 value={result.computedSha256}
               />
               <ResultField
@@ -156,6 +199,56 @@ export default function VerifyPage() {
                 value={result.notarizedSha256 || "—"}
               />
             </div>
+
+            <div className="mt-6 rounded-xl border border-border bg-white/80 p-4">
+              <div className="mb-3 text-xs font-medium uppercase tracking-wide text-textMuted">
+                Submitted metadata
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <MetaLine
+                  label="Issuer"
+                  value={result.submittedMetadata.issuer}
+                />
+                <MetaLine
+                  label="Receiver"
+                  value={result.submittedMetadata.receiver}
+                />
+                <MetaLine
+                  label="Document type"
+                  value={result.submittedMetadata.documentType}
+                />
+                <MetaLine
+                  label="Shipment ID"
+                  value={result.submittedMetadata.shipmentId}
+                />
+              </div>
+            </div>
+
+            {result.result !== "NOT_FOUND" && (
+              <div className="mt-4 rounded-xl border border-border bg-white/80 p-4">
+                <div className="mb-3 text-xs font-medium uppercase tracking-wide text-textMuted">
+                  Notarized metadata
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MetaLine
+                    label="Issuer"
+                    value={result.metadata.issuer ?? "—"}
+                  />
+                  <MetaLine
+                    label="Receiver"
+                    value={result.metadata.receiver ?? "—"}
+                  />
+                  <MetaLine
+                    label="Document type"
+                    value={result.metadata.documentType ?? "—"}
+                  />
+                  <MetaLine
+                    label="Shipment ID"
+                    value={result.metadata.shipmentId ?? "—"}
+                  />
+                </div>
+              </div>
+            )}
 
             {result.result !== "NOT_FOUND" && result.notarizedAt && (
               <div className="mt-4">
@@ -194,6 +287,39 @@ function ResultField({ label, value }: { label: string; value: string }) {
       <div className="rounded-xl border border-border bg-white/80 px-3 py-3 font-mono text-sm break-all">
         {value}
       </div>
+    </div>
+  );
+}
+
+function VerifyField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-textMuted">
+        {label}
+      </label>
+      <input
+        className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primarySoft"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Optional"
+      />
+    </div>
+  );
+}
+
+function MetaLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs text-textMuted">{label}</div>
+      <div className="mt-0.5 text-sm font-medium text-text">{value || "—"}</div>
     </div>
   );
 }

@@ -3,7 +3,11 @@ import path from "node:path";
 import { v4 as uuidv4 } from "uuid";
 
 import { env } from "../config/env.js";
-import { sha256FromBuffer } from "../utils/hash.js";
+import { sha256FromFileAndMetadata } from "../utils/hash.js";
+import {
+  serializeMetadataForHash,
+  type DocumentBusinessMetadata,
+} from "../utils/documentMetadata.js";
 import { notarizeLocked } from "../iota/notarizationClient.js";
 import { insertDocument } from "../db/documentsRepo.js";
 
@@ -12,7 +16,7 @@ export type NotarizeParams = {
   originalFilename: string;
   mimeType: string;
   sizeBytes: number;
-  metadata: Record<string, any>;
+  metadata: DocumentBusinessMetadata;
 };
 
 function ensureDir(dir: string) {
@@ -20,7 +24,8 @@ function ensureDir(dir: string) {
 }
 
 export async function notarizeDocument(params: NotarizeParams) {
-  const sha256 = sha256FromBuffer(params.fileBuffer);
+  const metadataJson = serializeMetadataForHash(params.metadata);
+  const sha256 = sha256FromFileAndMetadata(params.fileBuffer, metadataJson);
 
   const iota = await notarizeLocked({
     sha256Hex: sha256,

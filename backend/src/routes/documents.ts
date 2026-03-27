@@ -2,14 +2,11 @@ import { Router } from "express";
 import { upload } from "../middleware/upload.js";
 import { z } from "zod";
 
-import {
-  insertDocument,
-  getDocuments,
-  getDocumentById,
-} from "../db/documentsRepo.js";
+import { getDocuments, getDocumentById } from "../db/documentsRepo.js";
 
 import { notarizeDocument } from "../services/documentsService.js";
 import { verifyDocument } from "../services/verifyService.js";
+import { parseMetadataJsonField } from "../utils/documentMetadata.js";
 
 export const documentsRouter = Router();
 
@@ -17,23 +14,12 @@ documentsRouter.post("/notarize", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Missing file" });
 
-    const metaSchema = z.object({
-      documentNumber: z.string().trim().min(1).optional(),
-      documentDate: z.string().trim().min(1).optional(),
-      client: z.string().trim().min(1).optional(),
-    });
-
-    const parsedMetadata = metaSchema.safeParse({
-      documentNumber: req.body?.documentNumber,
-      documentDate: req.body?.documentDate,
-      client: req.body?.client,
-    });
-
-    if (!parsedMetadata.success) {
-      return res.status(400).json({ error: "Invalid metadata" });
+    const parsedMetadata = parseMetadataJsonField(req.body?.metadata);
+    if (!parsedMetadata.ok) {
+      return res.status(400).json({ error: parsedMetadata.error });
     }
 
-    const metadata = parsedMetadata.data;
+    const metadata = parsedMetadata.value;
 
     const result = await notarizeDocument({
       fileBuffer: req.file.buffer,
@@ -75,12 +61,22 @@ documentsRouter.post("/verify", upload.single("file"), async (req, res) => {
     const bodySchema = z.object({
       docId: z.string().optional(),
       sha256: z.string().optional(),
+      metadata: z.string().optional(),
     });
 
     const parsed = bodySchema.safeParse(req.body || {});
     if (!parsed.success) return res.status(400).json({ error: "Invalid body" });
 
-    const result = await verifyDocument(req.file.buffer, parsed.data);
+    const parsedMetadata = parseMetadataJsonField(parsed.data.metadata);
+    if (!parsedMetadata.ok) {
+      return res.status(400).json({ error: parsedMetadata.error });
+    }
+
+    const result = await verifyDocument(req.file.buffer, {
+      docId: parsed.data.docId,
+      sha256: parsed.data.sha256,
+      submittedMetadata: parsedMetadata.value,
+    });
 
     return res.json(result);
   } catch (err: any) {
