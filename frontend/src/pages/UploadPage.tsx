@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import Shell from "../components/Shell";
 import { apiNotarize } from "../lib/api/documents";
-import { sha256FileAndMetadata } from "../lib/documentMetadata";
+import {
+  normalizeMetadata,
+  sha256FileAndMetadata,
+} from "../lib/documentMetadata";
 import type { NotarizeResponse } from "../types/document";
 
 type Step = "IDLE" | "HASH" | "NOTARIZING" | "DONE" | "ERROR";
@@ -18,12 +21,13 @@ export default function UploadPage() {
   const [shipmentId, setShipmentId] = useState("");
 
   const metadataPayload = useMemo(
-    () => ({
-      issuer: issuer.trim(),
-      receiver: receiver.trim(),
-      documentType: documentType.trim(),
-      shipmentId: shipmentId.trim(),
-    }),
+    () =>
+      normalizeMetadata({
+        issuer,
+        receiver,
+        documentType,
+        shipmentId,
+      }),
     [issuer, receiver, documentType, shipmentId],
   );
 

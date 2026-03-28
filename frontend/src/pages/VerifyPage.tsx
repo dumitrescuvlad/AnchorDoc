@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Shell from "../components/Shell";
 import { apiGetDocument } from "../lib/api/documents";
+import { normalizeMetadata } from "../lib/documentMetadata";
 import { apiVerify } from "../lib/api/verify";
 import type { VerifyResult } from "../types/verify";
 
@@ -59,12 +60,13 @@ export default function VerifyPage() {
   }, [docId]);
 
   const metadataPayload = useMemo(
-    () => ({
-      issuer: issuer.trim(),
-      receiver: receiver.trim(),
-      documentType: documentType.trim(),
-      shipmentId: shipmentId.trim(),
-    }),
+    () =>
+      normalizeMetadata({
+        issuer,
+        receiver,
+        documentType,
+        shipmentId,
+      }),
     [issuer, receiver, documentType, shipmentId],
   );
 

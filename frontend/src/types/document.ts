@@ -1,5 +1,6 @@
 export type DocumentStatus = "NOTARIZED";
 
+/** Normalized metadata returned by the API (all keys present). */
 export type DocumentMetadata = {
   issuer: string;
   receiver: string;

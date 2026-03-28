@@ -1,12 +1,39 @@
 export type DocumentBusinessMetadata = {
+  issuer?: string;
+  receiver?: string;
+  shipmentId?: string;
+  documentType?: string;
+};
+
+export type CanonicalBusinessMetadata = {
   issuer: string;
   receiver: string;
   documentType: string;
   shipmentId: string;
 };
 
+export function normalizeMetadata(input: unknown): CanonicalBusinessMetadata {
+  const raw =
+    input != null && typeof input === "object" && !Array.isArray(input)
+      ? (input as Record<string, unknown>)
+      : {};
+
+  const str = (key: string) => {
+    const v = raw[key];
+    if (v == null) return "";
+    return String(v).trim();
+  };
+
+  return {
+    issuer: str("issuer"),
+    receiver: str("receiver"),
+    documentType: str("documentType"),
+    shipmentId: str("shipmentId"),
+  };
+}
+
 export function serializeMetadataForHash(
-  metadata: DocumentBusinessMetadata,
+  metadata: CanonicalBusinessMetadata,
 ): string {
   return JSON.stringify({
     issuer: metadata.issuer,
@@ -18,7 +45,7 @@ export function serializeMetadataForHash(
 
 export async function sha256FileAndMetadata(
   file: File,
-  metadata: DocumentBusinessMetadata,
+  metadata: CanonicalBusinessMetadata,
 ): Promise<string> {
   const fileBuf = await file.arrayBuffer();
   const metaBytes = new TextEncoder().encode(serializeMetadataForHash(metadata));

@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { env } from "../config/env.js";
 import { sha256FromFileAndMetadata } from "../utils/hash.js";
 import {
+  normalizeMetadata,
   serializeMetadataForHash,
   type DocumentBusinessMetadata,
 } from "../utils/documentMetadata.js";
@@ -24,13 +25,14 @@ function ensureDir(dir: string) {
 }
 
 export async function notarizeDocument(params: NotarizeParams) {
-  const metadataJson = serializeMetadataForHash(params.metadata);
+  const metadata = normalizeMetadata(params.metadata);
+  const metadataJson = serializeMetadataForHash(metadata);
   const sha256 = sha256FromFileAndMetadata(params.fileBuffer, metadataJson);
 
   const iota = await notarizeLocked({
     sha256Hex: sha256,
     description: "AnchorDoc DDT integrity proof",
-    updatableMetadata: JSON.stringify(params.metadata),
+    updatableMetadata: metadataJson,
   });
 
   const docId = uuidv4();
@@ -54,7 +56,7 @@ export async function notarizeDocument(params: NotarizeParams) {
     iotaExplorerUrl: iota.explorerUrl,
     notarizedAt: iota.notarizedAtIso,
     status: "NOTARIZED",
-    metadataJson: JSON.stringify(params.metadata),
+    metadataJson: JSON.stringify(metadata),
     createdAt: nowIso,
   });
 
@@ -70,7 +72,7 @@ export async function notarizeDocument(params: NotarizeParams) {
     iotaExplorerUrl: iota.explorerUrl,
     notarizedAt: iota.notarizedAtIso,
     status: "NOTARIZED",
-    metadata: params.metadata,
+    metadata,
     createdAt: nowIso,
   };
 }

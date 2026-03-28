@@ -3,6 +3,7 @@ import {
   isBlankMetadata,
   normalizeMetadata,
   serializeMetadataForHash,
+  type CanonicalBusinessMetadata,
   type DocumentBusinessMetadata,
 } from "../utils/documentMetadata.js";
 import {
@@ -27,7 +28,7 @@ export type VerifyResult =
       iotaTxDigest: null;
       iotaObjectId: null;
       metadata: Record<string, unknown>;
-      submittedMetadata: DocumentBusinessMetadata;
+      submittedMetadata: CanonicalBusinessMetadata;
     }
   | {
       result: "VERIFIED" | "MODIFIED";
@@ -38,7 +39,7 @@ export type VerifyResult =
       iotaTxDigest: string | null;
       iotaObjectId: string | null;
       metadata: Record<string, unknown>;
-      submittedMetadata: DocumentBusinessMetadata;
+      submittedMetadata: CanonicalBusinessMetadata;
     };
 
 export async function verifyDocument(
@@ -48,6 +49,8 @@ export async function verifyDocument(
   const docId = params.docId?.trim() || undefined;
   const shaHint = params.sha256?.trim() || undefined;
 
+  const submittedCanonical = normalizeMetadata(params.submittedMetadata);
+
   let recordFromHint: DocumentRow | undefined;
   if (docId) {
     recordFromHint = getDocumentById(docId);
@@ -56,13 +59,13 @@ export async function verifyDocument(
     recordFromHint = getDocumentBySha(shaHint);
   }
 
-  const metadataForHash: DocumentBusinessMetadata = recordFromHint
+  const metadataForHash: CanonicalBusinessMetadata = recordFromHint
     ? normalizeMetadata(JSON.parse(recordFromHint.metadataJson || "{}"))
-    : params.submittedMetadata;
+    : submittedCanonical;
 
   const metadataJson = serializeMetadataForHash(metadataForHash);
   const computedSha256 = sha256FromFileAndMetadata(fileBuffer, metadataJson);
-  const legacyBlank = isBlankMetadata(params.submittedMetadata);
+  const legacyBlank = isBlankMetadata(submittedCanonical);
   const legacyFileOnlySha = legacyBlank ? sha256FromBuffer(fileBuffer) : null;
 
   let record: DocumentRow | undefined;
