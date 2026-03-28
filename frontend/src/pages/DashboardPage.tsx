@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import Shell from "../components/Shell";
 import { apiGetDocument, apiGetDocuments } from "../lib/api/documents";
 import { apiVerify } from "../lib/api/verify";
@@ -296,6 +297,12 @@ export default function DashboardPage() {
                 >
                   Verify document
                 </button>
+                <Link
+                  className="mt-2 flex w-full items-center justify-center rounded-xl border border-border bg-white px-3 py-2.5 text-sm font-medium transition hover:bg-surface"
+                  to={`/verify?docId=${encodeURIComponent(selected.id)}`}
+                >
+                  Verify on verify page
+                </Link>
               </div>
             ) : (
               <div className="mt-5 text-sm text-textMuted">

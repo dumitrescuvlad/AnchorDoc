@@ -1,18 +1,62 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Shell from "../components/Shell";
+import { apiGetDocument } from "../lib/api/documents";
 import { apiVerify } from "../lib/api/verify";
 import type { VerifyResult } from "../types/verify";
 
+const DOC_ID_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function looksLikeSha256Hex(s: string) {
+  const t = s.trim();
+  return t.length === 64 && /^[0-9a-f]+$/i.test(t);
+}
+
 export default function VerifyPage() {
+  const [searchParams] = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
   const [docId, setDocId] = useState("");
   const [sha, setSha] = useState("");
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [docIdHintError, setDocIdHintError] = useState<string | null>(null);
   const [issuer, setIssuer] = useState("");
   const [receiver, setReceiver] = useState("");
   const [documentType, setDocumentType] = useState("");
   const [shipmentId, setShipmentId] = useState("");
+
+  useEffect(() => {
+    const fromUrl = searchParams.get("docId");
+    if (fromUrl?.trim()) {
+      setDocId(fromUrl.trim());
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const id = docId.trim();
+    if (!DOC_ID_UUID_RE.test(id)) {
+      setDocIdHintError(null);
+      return;
+    }
+
+    const t = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const d = await apiGetDocument(id);
+          setIssuer(d.metadata.issuer ?? "");
+          setReceiver(d.metadata.receiver ?? "");
+          setDocumentType(d.metadata.documentType ?? "");
+          setShipmentId(d.metadata.shipmentId ?? "");
+          setDocIdHintError(null);
+        } catch {
+          setDocIdHintError("No document found for this ID.");
+        }
+      })();
+    }, 400);
+
+    return () => window.clearTimeout(t);
+  }, [docId]);
 
   const metadataPayload = useMemo(
     () => ({
@@ -57,9 +101,14 @@ export default function VerifyPage() {
               Verify document integrity
             </div>
             <div className="mt-2 text-sm leading-6 text-textMuted">
-              Upload a PDF to check whether it matches a notarized record. You
-              can optionally provide a document ID or SHA-256 hash to narrow the
-              verification target.
+              The fingerprint is the PDF plus the business metadata (issuer,
+              receiver, type, shipment ID) from when you notarized it. If you
+              paste the{" "}
+              <span className="font-medium text-text">document ID</span> or the
+              notarized <span className="font-medium text-text">SHA-256</span>,
+              you only need the file—those fields identify the stored metadata.
+              Otherwise, enter the same metadata you used at upload (or leave
+              all four empty if you left them empty then).
             </div>
           </div>
 
@@ -101,10 +150,13 @@ export default function VerifyPage() {
                 </label>
                 <input
                   className="w-full rounded-xl border border-border px-3.5 py-3 font-mono text-sm outline-none focus:ring-2 focus:ring-primarySoft"
-                  placeholder="Optional"
+                  placeholder="Optional — from dashboard"
                   value={docId}
                   onChange={(e) => setDocId(e.target.value)}
                 />
+                {docIdHintError && (
+                  <div className="mt-2 text-xs text-danger">{docIdHintError}</div>
+                )}
               </div>
 
               <div>
@@ -123,6 +175,13 @@ export default function VerifyPage() {
                 <div className="mb-3 text-xs font-medium uppercase tracking-wide text-textMuted">
                   Business metadata
                 </div>
+                {(docId.trim() && DOC_ID_UUID_RE.test(docId.trim())) ||
+                looksLikeSha256Hex(sha) ? (
+                  <div className="mb-3 text-xs leading-5 text-textMuted">
+                    Optional when document ID or SHA-256 is set—the server uses
+                    the notarized values for the check.
+                  </div>
+                ) : null}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <VerifyField
                     label="Issuer"
