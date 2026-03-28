@@ -48,7 +48,7 @@ export default function Shell({
           <div className="flex-1 px-3 py-5">
             <nav className="space-y-1.5">
               {session?.role === "company" ? (
-                <NavItem to="/upload" label="Anchor document" />
+                <NavItem to="/upload" label="Upload document" />
               ) : null}
               <NavItem to="/dashboard" label="Documents" />
               <NavItem to="/verify" label="Verify integrity" />
