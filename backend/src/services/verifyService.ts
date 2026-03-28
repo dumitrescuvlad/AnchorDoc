@@ -1,6 +1,7 @@
 import { sha256FromBuffer, sha256FromFileAndMetadata } from "../utils/hash.js";
 import {
   isBlankMetadata,
+  normalizeMetadata,
   serializeMetadataForHash,
   type DocumentBusinessMetadata,
 } from "../utils/documentMetadata.js";
@@ -44,19 +45,34 @@ export async function verifyDocument(
   fileBuffer: Buffer,
   params: VerifyParams,
 ): Promise<VerifyResult> {
-  const metadataJson = serializeMetadataForHash(params.submittedMetadata);
+  const docId = params.docId?.trim() || undefined;
+  const shaHint = params.sha256?.trim() || undefined;
+
+  let recordFromHint: DocumentRow | undefined;
+  if (docId) {
+    recordFromHint = getDocumentById(docId);
+  }
+  if (!recordFromHint && shaHint) {
+    recordFromHint = getDocumentBySha(shaHint);
+  }
+
+  const metadataForHash: DocumentBusinessMetadata = recordFromHint
+    ? normalizeMetadata(JSON.parse(recordFromHint.metadataJson || "{}"))
+    : params.submittedMetadata;
+
+  const metadataJson = serializeMetadataForHash(metadataForHash);
   const computedSha256 = sha256FromFileAndMetadata(fileBuffer, metadataJson);
   const legacyBlank = isBlankMetadata(params.submittedMetadata);
   const legacyFileOnlySha = legacyBlank ? sha256FromBuffer(fileBuffer) : null;
 
   let record: DocumentRow | undefined;
 
-  if (params.docId) {
-    record = getDocumentById(params.docId);
+  if (docId) {
+    record = getDocumentById(docId);
   }
 
-  if (!record && params.sha256) {
-    record = getDocumentBySha(params.sha256);
+  if (!record && shaHint) {
+    record = getDocumentBySha(shaHint);
   }
 
   if (!record) {
@@ -77,7 +93,7 @@ export async function verifyDocument(
       iotaTxDigest: null,
       iotaObjectId: null,
       metadata: {},
-      submittedMetadata: params.submittedMetadata,
+      submittedMetadata: metadataForHash,
     };
   }
 
@@ -97,6 +113,6 @@ export async function verifyDocument(
     iotaTxDigest: record.iotaTxDigest,
     iotaObjectId: record.iotaObjectId,
     metadata: JSON.parse(record.metadataJson || "{}"),
-    submittedMetadata: params.submittedMetadata,
+    submittedMetadata: metadataForHash,
   };
 }
